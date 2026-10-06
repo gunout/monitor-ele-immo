@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏠 Monitor Immobilier — Gironde (33)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bleu:#000091;--bleu-hi:#1212ff;--bleu-soft:#e3e3fd;
+  --rouge:#E1000F;--rouge-soft:#ffe9e9;
+  --or:#fbbf24;--or-soft:rgba(251,191,36,.15);
+  --vert:#16a34a;--vert-soft:#dcfce7;
+  --bg:#f6f6f6;--panel:#fff;--border:#e5e5e5;--text:#1e1e1e;--muted:#929292;
+  --mono:'SF Mono',Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+[data-theme="dark"]{
+  --bg:#12141a;--panel:#1a1d24;--border:#2a2e38;--text:#f0f2f5;--muted:#7a8090;
+  --bleu-soft:#1e1e4d;--rouge-soft:#3a1a1e;--vert-soft:#1a3a24;--or-soft:rgba(251,191,36,.1);
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh}
+.tricolore{height:6px;background:linear-gradient(to right,#000091 0 33.33%,#fff 33.33% 66.66%,#E1000F 66.66% 100%)}
+.header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.marianne{width:38px;height:38px;border-radius:50%;background:#000091;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2px solid #E1000F}
+.header-txt strong{display:block;color:var(--bleu);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.header-txt span{font-size:11px;color:var(--muted)}
+.topbar{background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:10px 16px;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.brand{font-size:14px;font-weight:800;color:var(--bleu);display:flex;align-items:center;gap:8px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--or);box-shadow:0 0 0 3px rgba(251,191,36,.2);animation:pulse 1.8s infinite}
+.brand .dot.ready{background:var(--vert);box-shadow:0 0 0 3px rgba(22,163,74,.2)}
+.brand .dot.error{background:var(--rouge);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.topbar-right{margin-left:auto;display:flex;gap:12px;font-family:var(--mono);font-size:11px;flex-wrap:wrap;align-items:center}
+.stat{display:flex;gap:5px;color:var(--muted);align-items:center}
+.stat .val{color:var(--bleu);font-weight:700;padding:2px 6px;border-radius:3px;background:var(--bleu-soft)}
+.stat .val.vert{color:var(--vert);background:var(--vert-soft)}
+.stat .val.or{color:#8a5e00;background:var(--or-soft)}
+.theme-toggle{background:var(--panel);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:16px}
+.app{display:grid;grid-template-columns:280px 1fr 300px;min-height:calc(100vh - 130px)}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:12px;overflow-y:auto;max-height:calc(100vh - 130px)}
+.sb-title{font-size:12px;font-weight:700;color:var(--bleu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sb-title::before{content:'';width:4px;height:14px;background:var(--or)}
+.scenario-item{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--muted);border-radius:4px;padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:.15s}
+.scenario-item:hover{border-color:var(--bleu);background:var(--bleu-soft);transform:translateX(2px)}
+.scenario-item.active{background:var(--bleu-soft);border-color:var(--bleu);border-left-color:var(--bleu)}
+.scenario-name{font-size:12px;font-weight:700;margin-bottom:4px}
+.scenario-desc{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.center{background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.search-bar{padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+.search-bar input{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:11px 14px;font-size:14px;color:var(--text);font-family:var(--sans)}
+.search-bar input:focus{outline:none;border-color:var(--bleu);box-shadow:0 0 0 2px var(--bleu-soft)}
+.btn{background:var(--bleu);color:#fff;border:1px solid var(--bleu);font-size:13px;font-weight:700;padding:11px 20px;border-radius:4px;cursor:pointer}
+.btn:hover{background:var(--bleu-hi)}
+.btn.secondary{background:var(--panel);color:var(--text);border-color:var(--border)}
+.btn.secondary:hover{border-color:var(--bleu);color:var(--bleu);background:var(--bleu-soft)}
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;padding:14px;background:var(--panel);border-bottom:1px solid var(--border)}
+.kpi{background:var(--bg);border:1px solid var(--border);border-left:4px solid var(--bleu);border-radius:4px;padding:10px 12px}
+.kpi .label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.kpi .value{font-size:16px;font-weight:800;color:var(--bleu);font-family:var(--mono)}
+.kpi .sub{font-size:9px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.kpi.vert{border-left-color:var(--vert)} .kpi.vert .value{color:var(--vert)}
+.kpi.or{border-left-color:var(--or)} .kpi.or .value{color:#8a5e00}
+.kpi.rouge{border-left-color:var(--rouge)} .kpi.rouge .value{color:var(--rouge)}
+.results{flex:1;overflow-y:auto;padding:14px;max-height:calc(100vh - 250px)}
+.card{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--bleu);border-radius:4px;padding:14px 16px;margin-bottom:10px;animation:fadeInUp .35s ease-out}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card h3{font-size:14px;color:var(--bleu);margin-bottom:8px}
+.card p{font-size:12px;color:var(--muted);margin-bottom:6px}
+.meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{background:var(--bg);padding:3px 8px;border-radius:3px;border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted)}
+.tag.bleu{background:var(--bleu-soft);color:var(--bleu);border-color:var(--bleu-soft)}
+.tag.vert{background:var(--vert-soft);color:var(--vert);border-color:var(--vert-soft)}
+.tag.rouge{background:var(--rouge-soft);color:var(--rouge);border-color:var(--rouge-soft)}
+.tag.or{background:var(--or-soft);color:#8a5e00;border-color:var(--or-soft)}
+.bar-row{display:grid;grid-template-columns:200px 1fr 100px;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
+.bar-row .name{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-weight:600}
+.bar-track{background:var(--border);border-radius:3px;height:18px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--bleu),var(--bleu-hi));border-radius:3px;width:0;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.bar-fill.vert{background:linear-gradient(90deg,var(--vert),#22c55e)}
+.bar-fill.or{background:linear-gradient(90deg,#8a5e00,var(--or))}
+.bar-fill.rouge{background:linear-gradient(90deg,var(--rouge),#ff4444)}
+.bar-row .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--bleu);font-weight:700;font-family:var(--mono)}
+.right{background:var(--panel);border-left:1px solid var(--border);padding:12px;overflow-y:auto;max-height:calc(100vh - 130px)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:10px;overflow:hidden}
+.panel-head{padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--bleu);text-transform:uppercase;letter-spacing:.5px}
+.panel-body{padding:10px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.row:last-child{border-bottom:none}
+.row .k{color:var(--muted)}
+.row .v{color:var(--text);font-weight:700;font-family:var(--mono);font-size:11px;text-align:right;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .v.bleu{color:var(--bleu)} .row .v.vert{color:var(--vert)} .row .v.rouge{color:var(--rouge)} .row .v.or{color:#8a5e00}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+th{background:var(--bg);color:var(--bleu);font-weight:700;text-transform:uppercase;font-size:10px;cursor:pointer;user-select:none}
+th:hover{background:var(--bleu-soft)}
+tr:hover td{background:var(--bleu-soft)}
+.mode-tabs{display:flex;gap:0;padding:0 10px;border-bottom:1px solid var(--border);background:var(--panel);overflow-x:auto;flex-wrap:nowrap}
+.mode-tab{background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:500;padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;font-family:var(--sans);white-space:nowrap}
+.mode-tab:hover{background:var(--bg);color:var(--bleu)}
+.mode-tab.active{color:var(--bleu);border-bottom-color:var(--bleu);font-weight:700}
+#leafletMap{height:600px;border-radius:4px;border:1px solid var(--border);z-index:1}
+.filters-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:10px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.filter-group{display:flex;flex-direction:column;gap:3px}
+.filter-group label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.filter-group input,.filter-group select{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--sans)}
+.filter-group input:focus,.filter-group select:focus{outline:none;border-color:var(--bleu);box-shadow:0 0 0 2px var(--bleu-soft)}
+.dual-input{display:flex;gap:4px}
+.dual-input input{flex:1;min-width:0}
+.actions-bar{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.actions-bar .count{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:var(--panel);padding:12px 20px;border-radius:6px;font-size:13px;font-weight:600;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:slideIn .3s}
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.success{background:var(--vert);color:#fff}
+.toast.error{background:var(--rouge);color:#fff}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--bleu);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2000;gap:16px}
+.loading-screen.hidden{display:none}
+.loading-screen .big-spinner{width:60px;height:60px;border:4px solid var(--border);border-top-color:var(--bleu);border-radius:50%;animation:spin 1s linear infinite}
+.loading-screen .msg{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;max-width:400px}
+.loading-screen .title{font-size:18px;font-weight:800;color:var(--bleu)}
+@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar,.right{border:none;border-bottom:1px solid var(--border);max-height:none}}
+</style>
+</head>
+<body>
+<div class="loading-screen" id="loadingScreen">
+  <div class="title">🏠 Monitor Immobilier — Gironde</div>
+  <div class="big-spinner"></div>
+  <div class="msg" id="loadingMsg">Chargement des données…</div>
+</div>
+
+<div class="tricolore"></div>
+
+<div class="header">
+  <div class="marianne">RF</div>
+  <div class="header-txt">
+    <strong>République Française · Données DVF+</strong>
+    <span>Monitor Immobilier — Gironde (33) · 2014-2025</span>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot" id="statusDot"></span>MONITOR IMMOBILIER <span style="color:var(--muted);font-weight:400;font-size:12px">/ 33</span></div>
+  <div class="topbar-right">
+    <div class="stat"><span>TRANSACTIONS</span><span class="val" id="tbTotal">…</span></div>
+    <div class="stat"><span>PRIX/M² MOYEN</span><span class="val vert" id="tbAvg">…</span></div>
+    <div class="stat"><span>MÉDIANE</span><span class="val or" id="tbMedian">…</span></div>
+    <button class="theme-toggle" id="themeToggle" title="Thème">🌙</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sb-title">🎯 Analyses</div>
+    <div id="scenarioList"></div>
+  </aside>
+
+  <main class="center">
+    <div class="search-bar">
+      <input type="text" id="queryInput" placeholder="🔍 Filtrer par commune ou année (ex: Bordeaux, 2020)…">
+      <button class="btn" id="btnSearch">▶ Analyser</button>
+      <button class="btn secondary" id="btnReset">↺ Réinitialiser</button>
+    </div>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-view="overview">📊 Vue d'ensemble</button>
+      <button class="mode-tab" data-view="mutations">📋 Mutations</button>
+      <button class="mode-tab" data-view="evolution">📈 Évolution</button>
+      <button class="mode-tab" data-view="trend">📉 Tendance</button>
+      <button class="mode-tab" data-view="types">🏘️ Types</button>
+      <button class="mode-tab" data-view="map">🗺️ Carte</button>
+      <button class="mode-tab" data-view="topCommunes">🔥 Top communes</button>
+      <button class="mode-tab" data-view="histogram">📊 Distribution</button>
+      <button class="mode-tab" data-view="saisonnalite">📅 Saisonnalité</button>
+      <button class="mode-tab" data-view="comparateur">🎯 Comparateur</button>
+      <button class="mode-tab" data-view="rendement">💰 Rendement</button>
+      <button class="mode-tab" data-view="volatilite">📈 Volatilité</button>
+      <button class="mode-tab" data-view="topVentes">🏆 Top ventes</button>
+      <button class="mode-tab" data-view="anomalies">📉 Anomalies</button>
+      <button class="mode-tab" data-view="tension">🔬 Tension</button>
+    </div>
+
+    <div class="kpi-strip" id="kpiStrip"></div>
+    <div class="results" id="resultsArea">
+      <div style="text-align:center;padding:60px 20px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:16px">🏠</div>
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:16px">Monitor Immobilier</div>
+        <div>Chargement des données…</div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="right">
+    <div class="panel">
+      <div class="panel-head">📊 Synthèse Gironde</div>
+      <div class="panel-body">
+        <div class="row"><span class="k">Département</span><span class="v bleu">Gironde (33)</span></div>
+        <div class="row"><span class="k">Source</span><span class="v">DVF+ · Cerema</span></div>
+        <div class="row"><span class="k">Période</span><span class="v">2014-2025</span></div>
+        <div class="row"><span class="k">Transactions</span><span class="v bleu" id="ivTotal">…</span></div>
+        <div class="row"><span class="k">Prix/m² moyen</span><span class="v vert" id="ivAvg">…</span></div>
+        <div class="row"><span class="k">Prix/m² médian</span><span class="v or" id="ivMedian">…</span></div>
+        <div class="row"><span class="k">Prix/m² min</span><span class="v" id="ivMin">…</span></div>
+        <div class="row"><span class="k">Prix/m² max</span><span class="v rouge" id="ivMax">…</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">⚠️ Points de vigilance</div>
+      <div class="panel-body">
+        <div class="row"><span class="k">RGPD</span><span class="v or">Pas de ré-identification</span></div>
+        <div class="row"><span class="k">Outliers</span><span class="v">Filtre 200-30000 €/m²</span></div>
+        <div class="row"><span class="k">Source</span><span class="v">DVF+ 2014-2025</span></div>
+        <div class="row"><span class="k">Géoloc.</span><span class="v or">Centroïde commune</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">🏆 Top communes</div>
+      <div class="panel-body" id="topCommunes">…</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0);
+const fmtE = n => fmt(n) + ' €';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const COMMUNES_GEO = {};
+
+const SCENARIOS = [
+  {id:'s1', nom:'Vue d\'ensemble', desc:'Synthèse Gironde', view:'overview'},
+  {id:'s2', nom:'Mutations récentes', desc:'Dernières transactions', view:'mutations'},
+  {id:'s3', nom:'Évolution annuelle', desc:'Tendance des prix', view:'evolution'},
+  {id:'s4', nom:'Tendance longue', desc:'Courbe 2014-2025', view:'trend'},
+  {id:'s5', nom:'Types de biens', desc:'Répartition', view:'types'},
+  {id:'s6', nom:'Carte interactive', desc:'Heatmap + points', view:'map'},
+  {id:'s7', nom:'Top communes', desc:'Classement prix', view:'topCommunes'},
+  {id:'s8', nom:'Distribution', desc:'Histogramme', view:'histogram'},
+  {id:'s9', nom:'Saisonnalité', desc:'Ventes par mois', view:'saisonnalite'},
+  {id:'s10', nom:'Comparateur', desc:'2 communes', view:'comparateur'},
+  {id:'s11', nom:'Rendement locatif', desc:'Loyer / prix', view:'rendement'},
+  {id:'s12', nom:'Volatilité', desc:'Écart-type', view:'volatilite'},
+  {id:'s13', nom:'Top ventes', desc:'Records', view:'topVentes'},
+  {id:'s14', nom:'Anomalies', desc:'Détection 3σ', view:'anomalies'},
+  {id:'s15', nom:'Tension', desc:'Ventes / habitants', view:'tension'}
+];
+
+const POPULATION = {
+  '33063': 259809, '33115': 26627, '33009': 11247, '33227': 24677,
+  '33318': 65922, '33281': 73611, '33522': 42627, '33192': 72590,
+  '33075': 19878, '33162': 24729, '33119': 26757, '33069': 24592,
+  '33550': 42699, '33376': 32850, '33032': 17205, '33249': 14240,
+  '33003': 17898
+};
+
+const state = {
+  activeScenario:'s1',
+  activeView:'overview',
+  query:'',
+  queryType:'',
+  allRows:[],
+  stats:null,
+  theme:localStorage.getItem('mi-theme') || 'light',
+  leafletMap:null,
+  lastRows:[],
+  filters:{yearMin:'',yearMax:'',pm2Min:'',pm2Max:'',surfMin:'',surfMax:''},
+  sort:{col:0,dir:'desc'}
+};
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.theme);
+  $('themeToggle').textContent = state.theme === 'dark' ? '☀️' : '🌙';
+}
+$('themeToggle').onclick = () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('mi-theme', state.theme);
+  applyTheme();
+};
+
+function toast(msg, type='info'){
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+/* ========== CHARGEMENT ========== */
+async function loadData(){
+  const msg = $('loadingMsg');
+  try {
+    msg.textContent = 'Téléchargement des centroïdes…';
+    try {
+      const r = await fetch('data/communes.json');
+      if (r.ok) Object.assign(COMMUNES_GEO, await r.json());
+    } catch(e){ console.warn('communes.json absent'); }
+
+    msg.textContent = 'Téléchargement des mutations (peut prendre 30s)…';
+    const resp = await fetch('data/mutations.json.gz');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    msg.textContent = 'Décompression…';
+    const buf = await resp.arrayBuffer();
+    const decompressed = pako.ungzip(new Uint8Array(buf), {to: 'string'});
+
+    msg.textContent = 'Parsing JSON…';
+    const data = JSON.parse(decompressed);
+    state.allRows = data.rows || [];
+
+    msg.textContent = `Calcul des statistiques sur ${fmt(state.allRows.length)} lignes…`;
+    computeStats();
+
+    msg.textContent = 'Affichage…';
+    $('loadingScreen').classList.add('hidden');
+    $('statusDot').classList.add('ready');
+    toast(`✅ ${fmt(state.allRows.length)} transactions chargées`, 'success', 4000);
+  } catch(e){
+    console.error(e);
+    msg.innerHTML = `❌ Erreur : ${esc(e.message)}`;
+    $('statusDot').classList.add('error');
+  }
+}
+
+/* ========== STATISTIQUES ========== */
+function computeStats(){
+  const rows = state.allRows;
+  const prix = rows.map(r => r[6]).sort((a,b) => a-b);
+  const total = rows.length;
+  const avg = prix.reduce((a,b) => a+b, 0) / total || 0;
+  const mid = Math.floor(total / 2);
+  const median = total % 2 ? prix[mid] : (prix[mid-1] + prix[mid]) / 2;
+
+  const parAnnee = {};
+  for (const r of rows){
+    const annee = parseInt(r[0].substring(0, 4));
+    if (!annee) continue;
+    if (!parAnnee[annee]) parAnnee[annee] = {n: 0, sum: 0};
+    parAnnee[annee].n++;
+    parAnnee[annee].sum += r[6];
+  }
+  const by_year = Object.entries(parAnnee).map(([a, v]) => ({
+    annee: parseInt(a), n: v.n, avg_pm2: Math.round(v.sum / v.n)
+  })).sort((a,b) => a.annee - b.annee);
+
+  const parType = {};
+  for (const r of rows){
+    const t = r[3] || 'Non renseigné';
+    if (!parType[t]) parType[t] = {n: 0, sum: 0};
+    parType[t].n++;
+    parType[t].sum += r[6];
+  }
+  const by_type = Object.entries(parType).map(([t, v]) => ({
+    type_local: t, n: v.n, avg_pm2: Math.round(v.sum / v.n)
+  })).sort((a,b) => b.n - a.n);
+
+  const parCommune = {};
+  for (const r of rows){
+    const c = r[2] || '—';
+    if (!parCommune[c]) parCommune[c] = {n: 0, sum: 0, insee: r[1]};
+    parCommune[c].n++;
+    parCommune[c].sum += r[6];
+  }
+  const by_commune = Object.entries(parCommune).map(([c, v]) => ({
+    commune: c, code_insee: v.insee, n: v.n, avg_pm2: Math.round(v.sum / v.n)
+  })).sort((a,b) => b.n - a.n).slice(0, 50);
+
+  state.stats = {
+    total,
+    avg_prix_m2: Math.round(avg),
+    median_prix_m2: Math.round(median),
+    min_prix_m2: Math.round(prix[0] || 0),
+    max_prix_m2: Math.round(prix[prix.length-1] || 0),
+    by_year, by_type, by_commune
+  };
+}
+
+/* ========== EXPORT ========== */
+function exportCSV(){
+  const rows = state.lastRows || [];
+  if (!rows.length){ toast('❌ Aucune donnée', 'error'); return; }
+  const cols = ['date_mutation','code_insee','commune','type_local','surface_reelle_bati','valeur_fonciere','prix_m2'];
+  const esc2 = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [cols.join(',')];
+  for (const r of rows){ lines.push(r.map(esc2).join(',')); }
+  const blob = new Blob(['\ufeff' + lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mutations-gironde-${Date.now()}.csv`;
+  a.click();
+  toast(`📥 ${rows.length} lignes exportées`, 'success');
+}
+
+function exportJSON(){
+  const rows = state.lastRows || [];
+  if (!rows.length){ toast('❌ Aucune donnée', 'error'); return; }
+  const blob = new Blob([JSON.stringify(rows, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mutations-gironde-${Date.now()}.json`;
+  a.click();
+  toast(`📥 ${rows.length} lignes exportées (JSON)`, 'success');
+}
+
+/* ========== FILTRES ========== */
+function buildFiltersBar(){
+  return `
+    <div class="filters-bar">
+      <div class="filter-group">
+        <label>Année (min / max)</label>
+        <div class="dual-input">
+          <input type="number" id="fYearMin" placeholder="2014" min="2014" max="2025" value="${state.filters.yearMin}">
+          <input type="number" id="fYearMax" placeholder="2025" min="2014" max="2025" value="${state.filters.yearMax}">
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Prix/m² (€ min / max)</label>
+        <div class="dual-input">
+          <input type="number" id="fPm2Min" placeholder="200" value="${state.filters.pm2Min}">
+          <input type="number" id="fPm2Max" placeholder="30000" value="${state.filters.pm2Max}">
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Surface (m² min / max)</label>
+        <div class="dual-input">
+          <input type="number" id="fSurfMin" placeholder="9" value="${state.filters.surfMin}">
+          <input type="number" id="fSurfMax" placeholder="500" value="${state.filters.surfMax}">
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Type de bien</label>
+        <select id="fType">
+          <option value="">Tous</option>
+          ${(state.stats?.by_type || []).map(t => `<option value="${esc(t.type_local)}">${esc(t.type_local)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+}
+
+function readFilters(){
+  state.filters.yearMin = $('fYearMin')?.value || '';
+  state.filters.yearMax = $('fYearMax')?.value || '';
+  state.filters.pm2Min = $('fPm2Min')?.value || '';
+  state.filters.pm2Max = $('fPm2Max')?.value || '';
+  state.filters.surfMin = $('fSurfMin')?.value || '';
+  state.filters.surfMax = $('fSurfMax')?.value || '';
+}
+
+function applyFilters(rows){
+  const f = state.filters;
+  const typeFilter = $('fType')?.value || '';
+  return rows.filter(r => {
+    const annee = parseInt(r[0].substring(0, 4));
+    if (f.yearMin && annee < parseInt(f.yearMin)) return false;
+    if (f.yearMax && annee > parseInt(f.yearMax)) return false;
+    if (f.pm2Min && r[6] < parseFloat(f.pm2Min)) return false;
+    if (f.pm2Max && r[6] > parseFloat(f.pm2Max)) return false;
+    if (f.surfMin && r[4] < parseFloat(f.surfMin)) return false;
+    if (f.surfMax && r[4] > parseFloat(f.surfMax)) return false;
+    if (typeFilter && r[3] !== typeFilter) return false;
+    return true;
+  });
+}
+
+function sortRows(rows){
+  const {col, dir} = state.sort;
+  const mul = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const va = a[col], vb = b[col];
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * mul;
+    return String(va).localeCompare(String(vb)) * mul;
+  });
+}
+
+/* ========== RENDUS ========== */
+function renderScenarios(){
+  $('scenarioList').innerHTML = SCENARIOS.map(s => `
+    <div class="scenario-item ${state.activeScenario===s.id?'active':''}" data-id="${s.id}" data-view="${s.view}">
+      <div class="scenario-name">${esc(s.nom)}</div>
+      <div class="scenario-desc">${esc(s.desc)}</div>
+    </div>
+  `).join('');
+  document.querySelectorAll('#scenarioList .scenario-item').forEach(el => {
+    el.onclick = () => {
+      state.activeScenario = el.dataset.id;
+      state.activeView = el.dataset.view;
+      state.queryType = '';
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.view === state.activeView));
+      renderScenarios();
+      renderView();
+    };
+  });
+}
+
+function renderKPIs(){
+  if (!state.stats){ $('kpiStrip').innerHTML = ''; return; }
+  const s = state.stats;
+  const kpis = [
+    {label:'Transactions', value:fmt(s.total), sub:'total', cls:''},
+    {label:'Prix/m² moyen', value:fmtE(s.avg_prix_m2), sub:'moyenne', cls:'vert'},
+    {label:'Prix/m² médian', value:fmtE(s.median_prix_m2), sub:'robuste', cls:'or'},
+    {label:'Prix/m² min', value:fmtE(s.min_prix_m2), sub:'plancher', cls:''},
+    {label:'Prix/m² max', value:fmtE(s.max_prix_m2), sub:'plafond', cls:'rouge'}
+  ];
+  $('kpiStrip').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.cls}">
+      <div class="label">${esc(k.label)}</div>
+      <div class="value">${esc(k.value)}</div>
+      <div class="sub">${esc(k.sub)}</div>
+    </div>
+  `).join('');
+}
+
+function loadStatsUI(){
+  const s = state.stats;
+  $('tbTotal').textContent = fmt(s.total);
+  $('tbAvg').textContent = fmtE(s.avg_prix_m2);
+  $('tbMedian').textContent = fmtE(s.median_prix_m2);
+  $('ivTotal').textContent = fmt(s.total);
+  $('ivAvg').textContent = fmtE(s.avg_prix_m2);
+  $('ivMedian').textContent = fmtE(s.median_prix_m2);
+  $('ivMin').textContent = fmtE(s.min_prix_m2);
+  $('ivMax').textContent = fmtE(s.max_prix_m2);
+  renderKPIs();
+
+  $('topCommunes').innerHTML = (s.by_commune || []).slice(0, 10).map(c => `
+    <div class="row" style="cursor:pointer" onclick="document.getElementById('queryInput').value='${esc(c.commune)}';document.getElementById('btnSearch').click();">
+      <span class="k" title="${esc(c.commune)}">${esc(c.commune)}</span>
+      <span class="v bleu">${fmt(c.n)} · ${fmtE(c.avg_pm2)}</span>
+    </div>
+  `).join('') || '<div style="color:var(--muted);font-size:11px">Aucune</div>';
+}
+
+async function renderView(){
+  const area = $('resultsArea');
+  const s = state.stats;
+  if (!s){ return; }
+
+  switch(state.activeView){
+    case 'overview': {
+      const max = Math.max(...s.by_type.map(t => t.n), 1);
+      const top = state.allRows.slice(0, 8);
+      area.innerHTML = `
+        <div class="card">
+          <h3>📊 Répartition par type de bien</h3>
+          ${s.by_type.slice(0, 12).map(t => `
+            <div class="bar-row">
+              <div class="name">${esc(t.type_local || 'Autre')}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(t.n/max)*100}%"></div></div>
+              <div class="val">${fmt(t.n)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>📈 Évolution annuelle des prix</h3>
+          ${s.by_year.map(y => {
+            const maxY = Math.max(...s.by_year.map(x => x.avg_pm2), 1);
+            return `
+            <div class="bar-row">
+              <div class="name">${y.annee}</div>
+              <div class="bar-track"><div class="bar-fill vert" style="width:${(y.avg_pm2/maxY)*100}%"></div></div>
+              <div class="val">${fmtE(y.avg_pm2)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="card">
+          <h3>🕒 Dernières transactions</h3>
+          <table>
+            <thead><tr><th>Date</th><th>Commune</th><th>Type</th><th>Surface</th><th>Prix</th><th>€/m²</th></tr></thead>
+            <tbody>${top.map(r => `
+              <tr>
+                <td>${esc(r[0])}</td>
+                <td>${esc(r[2] || '—')}</td>
+                <td>${esc(r[3] || '—')}</td>
+                <td>${esc(r[4])} m²</td>
+                <td>${fmtE(r[5])}</td>
+                <td><strong>${fmtE(r[6])}</strong></td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>`;
+      break;
+    }
+    case 'mutations': {
+      area.innerHTML = `
+        ${buildFiltersBar()}
+        <div class="actions-bar">
+          <button class="btn" id="btnApplyFilters">🔍 Appliquer</button>
+          <button class="btn secondary" id="btnClearFilters">✕ Effacer</button>
+          <button class="btn secondary" id="btnExportCsv">📥 CSV</button>
+          <button class="btn secondary" id="btnExportJson">📥 JSON</button>
+          <span class="count" id="rowsCount"><span class="spinner"></span></span>
+        </div>
+        <div id="mutationsTable"></div>`;
+
+      let baseRows = state.allRows;
+      if (state.queryType) baseRows = baseRows.filter(r => r[3] === state.queryType);
+      if (state.query){
+        const q = state.query.toLowerCase();
+        baseRows = baseRows.filter(r => (r[2] || '').toLowerCase().includes(q) || String(r[0]).includes(q));
+      }
+      state.lastRows = baseRows;
+
+      const renderTable = () => {
+        const filtered = applyFilters(baseRows);
+        const sorted = sortRows(filtered);
+        state.lastRows = sorted;
+
+        $('rowsCount').innerHTML = `<strong>${fmt(sorted.length)}</strong> / ${fmt(baseRows.length)} lignes`;
+
+        const cols = [
+          {i:0,label:'Date'}, {i:2,label:'Commune'}, {i:3,label:'Type'},
+          {i:4,label:'Surface'}, {i:5,label:'Prix'}, {i:6,label:'€/m²'}
+        ];
+        const arrow = i => state.sort.col === i ? (state.sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+
+        $('mutationsTable').innerHTML = sorted.length === 0
+          ? '<div class="card"><p>Aucun résultat.</p></div>'
+          : `<div class="card">
+              <table>
+                <thead><tr>${cols.map(c => `<th data-col="${c.i}">${c.label}${arrow(c.i)}</th>`).join('')}</tr></thead>
+                <tbody>${sorted.slice(0, 300).map(r => `
+                  <tr>
+                    <td>${esc(r[0])}</td>
+                    <td>${esc(r[2] || '—')}</td>
+                    <td>${esc(r[3] || '—')}</td>
+                    <td>${esc(r[4])} m²</td>
+                    <td>${fmtE(r[5])}</td>
+                    <td><strong>${fmtE(r[6])}</strong></td>
+                  </tr>
+                `).join('')}</tbody>
+              </table>
+              ${sorted.length > 300 ? `<p style="text-align:center;color:var(--muted);margin-top:10px;font-size:11px">Affichage limité à 300 lignes (${fmt(sorted.length)} au total)</p>` : ''}
+            </div>`;
+
+        document.querySelectorAll('#mutationsTable th').forEach(th => {
+          th.onclick = () => {
+            const c = parseInt(th.dataset.col);
+            if (state.sort.col === c) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+            else { state.sort.col = c; state.sort.dir = 'asc'; }
+            renderTable();
+          };
+        });
+      };
+
+      $('btnApplyFilters').onclick = () => { readFilters(); renderTable(); };
+      $('btnClearFilters').onclick = () => {
+        state.filters = {yearMin:'',yearMax:'',pm2Min:'',pm2Max:'',surfMin:'',surfMax:''};
+        ['fYearMin','fYearMax','fPm2Min','fPm2Max','fSurfMin','fSurfMax'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+        const t = $('fType'); if (t) t.value = '';
+        renderTable();
+      };
+      $('btnExportCsv').onclick = exportCSV;
+      $('btnExportJson').onclick = exportJSON;
+
+      renderTable();
+      break;
+    }
+    case 'evolution': {
+      const max = Math.max(...s.by_year.map(r => r.avg_pm2), 1);
+      area.innerHTML = `
+        <div class="card">
+          <h3>📈 Évolution annuelle des prix au m²</h3>
+          ${s.by_year.map(r => `
+            <div class="bar-row">
+              <div class="name">${r.annee}</div>
+              <div class="bar-track"><div class="bar-fill or" style="width:${(r.avg_pm2/max)*100}%"></div></div>
+              <div class="val">${fmtE(r.avg_pm2)}</div>
+            </div>
+          `).join('')}
+        </div>`;
+      break;
+    }
+    case 'trend': {
+      const annees = s.by_year.filter(y => y.annee);
+      if (annees.length < 2){ area.innerHTML = '<div class="card"><p>Données insuffisantes.</p></div>'; break; }
+      const W = 800, H = 340, PAD_L = 70, PAD_R = 40, PAD_T = 40, PAD_B = 60;
+      const innerW = W - PAD_L - PAD_R, innerH = H - PAD_T - PAD_B;
+      const maxP = Math.max(...annees.map(a => a.avg_pm2));
+      const minP = Math.min(...annees.map(a => a.avg_pm2));
+      const range = maxP - minP || 1;
+      const pts = annees.map((a, i) => ({
+        x: PAD_L + (i / Math.max(1, annees.length - 1)) * innerW,
+        y: PAD_T + innerH - ((a.avg_pm2 - minP) / range) * innerH,
+        annee: a.annee, prix: a.avg_pm2, n: a.n
+      }));
+      const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`).join(' ');
+      const aire = line + ` L ${pts[pts.length-1].x} ${PAD_T + innerH} L ${pts[0].x} ${PAD_T + innerH} Z`;
+      const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
+        const y = PAD_T + innerH - f * innerH;
+        const v = minP + f * range;
+        return `<line x1="${PAD_L}" y1="${y}" x2="${W-PAD_R}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3 3"/>
+                <text x="${PAD_L-10}" y="${y+4}" text-anchor="end" font-family="var(--mono)" font-size="11" fill="var(--muted)">${Math.round(v)}€</text>`;
+      }).join('');
+      const points = pts.map(p => `
+        <circle cx="${p.x}" cy="${p.y}" r="6" fill="var(--or)" stroke="var(--panel)" stroke-width="2">
+          <title>${p.annee} : ${fmtE(p.prix)} (${p.n} ventes)</title>
+        </circle>
+        <text x="${p.x}" y="${H-PAD_B+24}" text-anchor="middle" font-family="var(--mono)" font-size="11" font-weight="700" fill="var(--bleu)">${p.annee}</text>
+        <text x="${p.x}" y="${p.y-14}" text-anchor="middle" font-family="var(--mono)" font-size="10" font-weight="700" fill="var(--bleu)">${p.prix}</text>
+      `).join('');
+      const d1 = pts[0], dN = pts[pts.length-1];
+      const delta = dN.prix - d1.prix;
+      const deltaPct = ((delta / d1.prix) * 100).toFixed(1);
+      area.innerHTML = `
+        <div class="card">
+          <h3>📉 Tendance longue ${d1.annee} → ${dN.annee}</h3>
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#000091" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#000091" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            ${grid}
+            <path d="${aire}" fill="url(#g1)"/>
+            <path d="${line}" fill="none" stroke="var(--bleu)" stroke-width="3" stroke-linecap="round"/>
+            ${points}
+          </svg>
+        </div>
+        <div class="card" style="border-left-color:${delta > 0 ? 'var(--vert)' : 'var(--rouge)'}">
+          <h3>Tendance globale</h3>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">
+            <div style="background:var(--bg);padding:12px;border-radius:4px;flex:1;min-width:140px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Δ prix/m²</div>
+              <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:${delta > 0 ? 'var(--vert)' : 'var(--rouge)'}">${delta > 0 ? '+' : ''}${fmtE(delta)}</div>
+            </div>
+            <div style="background:var(--bg);padding:12px;border-radius:4px;flex:1;min-width:140px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Δ %</div>
+              <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:${delta > 0 ? 'var(--vert)' : 'var(--rouge)'}">${delta > 0 ? '+' : ''}${deltaPct}%</div>
+            </div>
+            <div style="background:var(--bg);padding:12px;border-radius:4px;flex:1;min-width:140px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Amplitude</div>
+              <div style="font-size:14px;font-weight:800;color:var(--bleu)">${annees.length} ans</div>
+            </div>
+          </div>
+        </div>`;
+      break;
+    }
+    case 'types': {
+      area.innerHTML = s.by_type.map(t => `
+        <div class="card">
+          <h3>🏘️ ${esc(t.type_local || 'Non renseigné')}</h3>
+          <div class="meta">
+            <span class="tag bleu">${fmt(t.n)} ventes</span>
+            <span class="tag vert">${fmtE(t.avg_pm2)}/m² moyen</span>
+          </div>
+        </div>
+      `).join('');
+      break;
+    }
+    case 'map': {
+      area.innerHTML = `
+        <div class="card">
+          <h3>🗺️ Carte des transactions en Gironde</h3>
+          <p>Heatmap des prix + points individuels (échantillonnage automatique)</p>
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <select id="mapYear" style="padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text)">
+              <option value="">Toutes les années</option>
+            </select>
+            <select id="mapType" style="padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text)">
+              <option value="">Tous les types</option>
+            </select>
+            <select id="mapMode" style="padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text)">
+              <option value="heat">Heatmap</option>
+              <option value="points">Points</option>
+              <option value="both" selected>Heatmap + Points</option>
+            </select>
+            <button class="btn" id="mapReload">↻ Recharger</button>
+          </div>
+          <div id="leafletMap"></div>
+        </div>`;
+
+      const yearSel = document.getElementById('mapYear');
+      const typeSel = document.getElementById('mapType');
+      const modeSel = document.getElementById('mapMode');
+      s.by_year.forEach(y => yearSel.innerHTML += `<option value="${y.annee}">${y.annee}</option>`);
+      s.by_type.slice(0, 15).forEach(t => typeSel.innerHTML += `<option value="${esc(t.type_local)}">${esc(t.type_local)}</option>`);
+
+      if (state.leafletMap){ state.leafletMap.remove(); state.leafletMap = null; }
+
+      const map = L.map('leafletMap').setView([44.8378, -0.5792], 9);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(map);
+      state.leafletMap = map;
+
+      const markersLayer = L.layerGroup().addTo(map);
+      let heatLayer = null;
+
+      function loadMarkers(){
+        const y = yearSel.value, t = typeSel.value, mode = modeSel.value;
+        markersLayer.clearLayers();
+        if (heatLayer){ map.removeLayer(heatLayer); heatLayer = null; }
+
+        let rows = state.allRows;
+        if (y) rows = rows.filter(r => r[0].startsWith(y));
+        if (t) rows = rows.filter(r => r[3] === t);
+
+        const MAX = 5000;
+        if (rows.length > MAX){
+          const step = Math.ceil(rows.length / MAX);
+          rows = rows.filter((_, i) => i % step === 0);
+        }
+
+        const withGeo = rows.map(r => {
+          const geo = COMMUNES_GEO[r[1]];
+          if (!geo) return null;
+          return {r, lat: geo[0], lon: geo[1]};
+        }).filter(Boolean);
+
+        if (!withGeo.length){
+          document.getElementById('mapReload').textContent = '↻ Aucune coordonnée disponible';
+          return;
+        }
+
+        const prix = withGeo.map(x => x.r[6]).sort((a,b) => a-b);
+        const p10 = prix[Math.floor(prix.length * 0.1)] || 1000;
+        const p50 = prix[Math.floor(prix.length * 0.5)] || 3000;
+        const p90 = prix[Math.floor(prix.length * 0.9)] || 10000;
+
+        if (mode === 'heat' || mode === 'both'){
+          const heatData = withGeo.map(x => {
+            const intensity = Math.min(1, Math.max(0, (x.r[6] - p10) / (p90 - p10)));
+            return [x.lat, x.lon, intensity];
+          });
+          heatLayer = L.heatLayer(heatData, {
+            radius: 25, blur: 15, maxZoom: 15,
+            gradient: {0.0:'#0000ff', 0.3:'#00ffff', 0.5:'#00ff00', 0.7:'#ffff00', 1.0:'#ff0000'}
+          }).addTo(map);
+        }
+
+        if (mode === 'points' || mode === 'both'){
+          const colorFor = p => p < p10 ? '#16a34a' : p < p50 ? '#fbbf24' : p < p90 ? '#f59e0b' : '#E1000F';
+          withGeo.forEach(x => {
+            const c = colorFor(x.r[6]);
+            const m = L.circleMarker([x.lat, x.lon], {
+              radius: 3, fillColor: c, color: c, weight: 1, opacity: 0.7, fillOpacity: 0.5
+            });
+            m.bindPopup(`
+              <div style="font-family:system-ui;font-size:12px;min-width:180px">
+                <strong>${esc(x.r[0])}</strong><br>
+                ${esc(x.r[3] || '—')} · ${esc(x.r[4])} m²<br>
+                <strong style="color:#000091">${fmtE(x.r[6])}/m²</strong><br>
+                Prix total : ${fmtE(x.r[5])}<br>
+                <em>${esc(x.r[2] || '')}</em>
+              </div>
+            `);
+            markersLayer.addLayer(m);
+          });
+        }
+
+        document.getElementById('mapReload').textContent = `↻ Recharger (${fmt(withGeo.length)} points)`;
+      }
+
+      document.getElementById('mapReload').onclick = loadMarkers;
+      yearSel.onchange = loadMarkers;
+      typeSel.onchange = loadMarkers;
+      modeSel.onchange = loadMarkers;
+      loadMarkers();
+      break;
+    }
+    case 'topCommunes': {
+      const sorted = [...s.by_commune].sort((a, b) => b.avg_pm2 - a.avg_pm2);
+      const maxPrix = sorted[0]?.avg_pm2 || 1;
+      area.innerHTML = `
+        <div class="card">
+          <h3>🔥 Top 20 communes par prix/m²</h3>
+          <p>Classement des communes les plus chères de Gironde</p>
+          ${sorted.slice(0, 20).map((c, i) => `
+            <div class="bar-row">
+              <div class="name" style="cursor:pointer" onclick="document.getElementById('queryInput').value='${esc(c.commune)}';document.getElementById('btnSearch').click();">
+                #${i+1} ${esc(c.commune)}
+              </div>
+              <div class="bar-track"><div class="bar-fill rouge" style="width:${(c.avg_pm2/maxPrix)*100}%"></div></div>
+              <div class="val">${fmtE(c.avg_pm2)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>📊 Top 20 par volume de ventes</h3>
+          ${s.by_commune.slice(0, 20).map((c, i) => `
+            <div class="bar-row">
+              <div class="name">#${i+1} ${esc(c.commune)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(c.n/s.by_commune[0].n)*100}%"></div></div>
+              <div class="val">${fmt(c.n)}</div>
+            </div>
+          `).join('')}
+        </div>`;
+      break;
+    }
+    case 'histogram': {
+      const rows = state.allRows;
+      const tranches = [
+        {min:0, max:1000, label:'< 1 000 €', cls:'vert'},
+        {min:1000, max:2000, label:'1 000 - 2 000 €', cls:'vert'},
+        {min:2000, max:3000, label:'2 000 - 3 000 €', cls:'or'},
+        {min:3000, max:4000, label:'3 000 - 4 000 €', cls:'or'},
+        {min:4000, max:5000, label:'4 000 - 5 000 €', cls:''},
+        {min:5000, max:7000, label:'5 000 - 7 000 €', cls:''},
+        {min:7000, max:10000, label:'7 000 - 10 000 €', cls:'rouge'},
+        {min:10000, max:999999, label:'> 10 000 €', cls:'rouge'}
+      ];
+      const counts = tranches.map(t => rows.filter(r => r[6] >= t.min && r[6] < t.max).length);
+      const maxCount = Math.max(...counts);
+      const total = rows.length;
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>📊 Distribution des prix au m²</h3>
+          <p>${fmt(total)} transactions réparties en ${tranches.length} tranches</p>
+          ${tranches.map((t, i) => `
+            <div class="bar-row">
+              <div class="name">${t.label}</div>
+              <div class="bar-track"><div class="bar-fill ${t.cls}" style="width:${(counts[i]/maxCount)*100}%"></div></div>
+              <div class="val">${fmt(counts[i])} (${((counts[i]/total)*100).toFixed(1)}%)</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>📈 Statistiques</h3>
+          <div class="row"><span class="k">Nombre total</span><span class="v bleu">${fmt(total)}</span></div>
+          <div class="row"><span class="k">Moyenne</span><span class="v vert">${fmtE(s.avg_prix_m2)}</span></div>
+          <div class="row"><span class="k">Médiane</span><span class="v or">${fmtE(s.median_prix_m2)}</span></div>
+          <div class="row"><span class="k">Min</span><span class="v">${fmtE(s.min_prix_m2)}</span></div>
+          <div class="row"><span class="k">Max</span><span class="v rouge">${fmtE(s.max_prix_m2)}</span></div>
+        </div>`;
+      break;
+    }
+    case 'saisonnalite': {
+      const rows = state.allRows;
+      const parMois = Array.from({length: 12}, () => ({n: 0, sum: 0}));
+      for (const r of rows){
+        const mois = parseInt(r[0].substring(5, 7)) - 1;
+        if (mois >= 0 && mois < 12){
+          parMois[mois].n++;
+          parMois[mois].sum += r[6];
+        }
+      }
+      const maxN = Math.max(...parMois.map(m => m.n));
+      const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+      const maxIdx = parMois.findIndex(m => m.n === maxN);
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>📅 Saisonnalité des ventes</h3>
+          <p>Nombre de transactions par mois (cumulé 2014-2025)</p>
+          ${parMois.map((m, i) => `
+            <div class="bar-row">
+              <div class="name">${moisNoms[i]}</div>
+              <div class="bar-track"><div class="bar-fill ${m.n === maxN ? 'rouge' : ''}" style="width:${(m.n/maxN)*100}%"></div></div>
+              <div class="val">${fmt(m.n)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>💡 Interprétation</h3>
+          <p>Le mois de <strong>${moisNoms[maxIdx]}</strong> concentre le plus de ventes (${fmt(maxN)} transactions).</p>
+          <p>Les mois d'hiver sont généralement plus calmes.</p>
+        </div>`;
+      break;
+    }
+    case 'comparateur': {
+      const communes = s.by_commune.slice(0, 50);
+      area.innerHTML = `
+        <div class="card">
+          <h3>🎯 Comparateur de communes</h3>
+          <div style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap">
+            <select id="compA" style="flex:1;padding:10px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text)">
+              ${communes.map((c,i) => `<option value="${c.code_insee}" ${i===0?'selected':''}>${esc(c.commune)}</option>`).join('')}
+            </select>
+            <span style="align-self:center;color:var(--muted);font-weight:700">VS</span>
+            <select id="compB" style="flex:1;padding:10px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text)">
+              ${communes.map((c,i) => `<option value="${c.code_insee}" ${i===1?'selected':''}>${esc(c.commune)}</option>`).join('')}
+            </select>
+            <button class="btn" id="compBtn">Comparer</button>
+          </div>
+          <div id="compResult"></div>
+        </div>`;
+
+      const comparer = () => {
+        const a = document.getElementById('compA').value;
+        const b = document.getElementById('compB').value;
+        const rowsA = state.allRows.filter(r => r[1] === a);
+        const rowsB = state.allRows.filter(r => r[1] === b);
+        if (!rowsA.length || !rowsB.length){
+          document.getElementById('compResult').innerHTML = '<p>Aucune donnée pour l\'une des communes.</p>';
+          return;
+        }
+        const statsFor = (rows) => {
+          const prix = rows.map(r => r[6]).sort((x,y) => x-y);
+          return {
+            n: rows.length,
+            moy: Math.round(prix.reduce((a,b) => a+b,0) / rows.length),
+            med: Math.round(prix[Math.floor(prix.length/2)]),
+            min: Math.round(prix[0]),
+            max: Math.round(prix[prix.length-1])
+          };
+        };
+        const sA = statsFor(rowsA);
+        const sB = statsFor(rowsB);
+        const nomA = rowsA[0][2];
+        const nomB = rowsB[0][2];
+        const diff = ((sA.moy - sB.moy) / sB.moy * 100).toFixed(1);
+        const plusCher = sA.moy > sB.moy ? nomA : nomB;
+        const moinsCher = sA.moy > sB.moy ? nomB : nomA;
+
+        document.getElementById('compResult').innerHTML = `
+          <table style="width:100%;margin-top:12px">
+            <thead><tr><th>Critère</th><th>${esc(nomA)}</th><th>${esc(nomB)}</th></tr></thead>
+            <tbody>
+              <tr><td>Transactions</td><td>${fmt(sA.n)}</td><td>${fmt(sB.n)}</td></tr>
+              <tr><td>Prix/m² moyen</td><td>${fmtE(sA.moy)}</td><td>${fmtE(sB.moy)}</td></tr>
+              <tr><td>Prix/m² médian</td><td>${fmtE(sA.med)}</td><td>${fmtE(sB.med)}</td></tr>
+              <tr><td>Minimum</td><td>${fmtE(sA.min)}</td><td>${fmtE(sB.min)}</td></tr>
+              <tr><td>Maximum</td><td>${fmtE(sA.max)}</td><td>${fmtE(sB.max)}</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:16px;padding:12px;background:var(--bleu-soft);border-left:4px solid var(--bleu);border-radius:4px">
+            <strong>${esc(plusCher)}</strong> est <strong>${Math.abs(diff)}%</strong> plus cher que <strong>${esc(moinsCher)}</strong>.
+          </div>`;
+      };
+      document.getElementById('compBtn').onclick = comparer;
+      comparer();
+      break;
+    }
+    case 'rendement': {
+      const rows = state.allRows.filter(r => r[3] === 'UN APPARTEMENT' || r[3] === 'UNE MAISON');
+      const parCommune = {};
+      for (const r of rows){
+        const c = r[2] || '—';
+        if (!parCommune[c]) parCommune[c] = {n: 0, sum: 0};
+        parCommune[c].n++;
+        parCommune[c].sum += r[6];
+      }
+      const rendements = Object.entries(parCommune)
+        .filter(([_, v]) => v.n >= 10)
+        .map(([c, v]) => {
+          const prixMoyen = v.sum / v.n;
+          const loyerMensuelM2 = prixMoyen * 0.004;
+          const rendementBrut = (loyerMensuelM2 * 12) / prixMoyen * 100;
+          return {commune: c, n: v.n, prix_m2: Math.round(prixMoyen), loyer_m2: Math.round(loyerMensuelM2*10)/10, rendement: rendementBrut.toFixed(1)};
+        })
+        .sort((a, b) => parseFloat(b.rendement) - parseFloat(a.rendement));
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>💰 Rendement locatif brut estimé</h3>
+          <p>Estimation : loyer = 0,4 % du prix/m² par mois (≈ 4,8 % brut annuel)</p>
+          ${rendements.slice(0, 25).map((r, i) => `
+            <div class="bar-row">
+              <div class="name">#${i+1} ${esc(r.commune)}</div>
+              <div class="bar-track"><div class="bar-fill vert" style="width:${Math.min(100, parseFloat(r.rendement)/8*100)}%"></div></div>
+              <div class="val">${r.rendement}%</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>📋 Détail</h3>
+          <table>
+            <thead><tr><th>Commune</th><th>Prix/m²</th><th>Loyer/m²</th><th>Rendement</th></tr></thead>
+            <tbody>${rendements.slice(0, 15).map(r => `
+              <tr>
+                <td>${esc(r.commune)}</td>
+                <td>${fmtE(r.prix_m2)}</td>
+                <td>${r.loyer_m2} €/m²/mois</td>
+                <td class="v vert"><strong>${r.rendement}%</strong></td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>`;
+      break;
+    }
+    case 'volatilite': {
+      const rows = state.allRows;
+      const parCommune = {};
+      for (const r of rows){
+        const c = r[2] || '—';
+        if (!parCommune[c]) parCommune[c] = [];
+        parCommune[c].push(r[6]);
+      }
+      const vols = Object.entries(parCommune)
+        .filter(([_, arr]) => arr.length >= 20)
+        .map(([c, arr]) => {
+          const moy = arr.reduce((a,b) => a+b,0) / arr.length;
+          const variance = arr.reduce((s, x) => s + Math.pow(x - moy, 2), 0) / arr.length;
+          const ecartType = Math.sqrt(variance);
+          const cv = (ecartType / moy) * 100;
+          return {commune: c, n: arr.length, moy: Math.round(moy), ecart: Math.round(ecartType), cv: cv.toFixed(1)};
+        })
+        .sort((a, b) => parseFloat(b.cv) - parseFloat(a.cv));
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>📈 Volatilité des prix par commune</h3>
+          <p>Coefficient de variation (écart-type / moyenne)</p>
+          ${vols.slice(0, 25).map(v => `
+            <div class="bar-row">
+              <div class="name">${esc(v.commune)}</div>
+              <div class="bar-track"><div class="bar-fill ${parseFloat(v.cv) > 50 ? 'rouge' : parseFloat(v.cv) > 30 ? 'or' : 'vert'}" style="width:${Math.min(100, parseFloat(v.cv))}%"></div></div>
+              <div class="val">${v.cv}%</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>💡 Interprétation</h3>
+          <p>Un CV &lt; 30 % indique un marché <strong>homogène</strong>.</p>
+          <p>Un CV &gt; 50 % indique un marché <strong>hétérogène</strong>.</p>
+        </div>`;
+      break;
+    }
+    case 'topVentes': {
+      const top = [...state.allRows].sort((a, b) => b[5] - a[5]).slice(0, 50);
+      area.innerHTML = `
+        <div class="card">
+          <h3>🏆 Top 50 des ventes les plus chères</h3>
+          <table>
+            <thead><tr><th>#</th><th>Date</th><th>Commune</th><th>Type</th><th>Surface</th><th>Prix total</th><th>€/m²</th></tr></thead>
+            <tbody>${top.map((r, i) => `
+              <tr>
+                <td><strong>${i+1}</strong></td>
+                <td>${esc(r[0])}</td>
+                <td>${esc(r[2] || '—')}</td>
+                <td>${esc(r[3] || '—')}</td>
+                <td>${fmt(r[4])} m²</td>
+                <td class="v rouge"><strong>${fmtE(r[5])}</strong></td>
+                <td>${fmtE(r[6])}</td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>`;
+      break;
+    }
+    case 'anomalies': {
+      const rows = state.allRows;
+      const parCommune = {};
+      for (const r of rows){
+        const c = r[2] || '—';
+        if (!parCommune[c]) parCommune[c] = [];
+        parCommune[c].push(r);
+      }
+      const anomalies = [];
+      for (const [commune, arr] of Object.entries(parCommune)){
+        if (arr.length < 10) continue;
+        const prix = arr.map(r => r[6]).sort((a,b) => a-b);
+        const med = prix[Math.floor(prix.length/2)];
+        const ecart = Math.sqrt(prix.reduce((s, p) => s + Math.pow(p - med, 2), 0) / prix.length);
+        const seuilHaut = med + 3 * ecart;
+        const seuilBas = med - 3 * ecart;
+        for (const r of arr){
+          if (r[6] > seuilHaut || r[6] < seuilBas){
+            anomalies.push({
+              r, commune, med, ecart: Math.round(ecart),
+              type: r[6] > seuilHaut ? 'surévalué' : 'sous-évalué',
+              sigma: ((r[6] - med) / ecart).toFixed(1)
+            });
+          }
+        }
+      }
+      anomalies.sort((a, b) => Math.abs(b.sigma) - Math.abs(a.sigma));
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>📉 Détection d'anomalies (3σ)</h3>
+          <p>${fmt(anomalies.length)} transactions s'écartent de plus de 3 écarts-types de la médiane communale</p>
+          <div class="meta" style="margin-bottom:12px">
+            <span class="tag rouge">${anomalies.filter(a => a.type === 'surévalué').length} surévaluées</span>
+            <span class="tag vert">${anomalies.filter(a => a.type === 'sous-évalué').length} sous-évaluées</span>
+          </div>
+          <table>
+            <thead><tr><th>Date</th><th>Commune</th><th>Type</th><th>Prix/m²</th><th>Médiane</th><th>σ</th><th>Alerte</th></tr></thead>
+            <tbody>${anomalies.slice(0, 100).map(a => `
+              <tr>
+                <td>${esc(a.r[0])}</td>
+                <td>${esc(a.commune)}</td>
+                <td>${esc(a.r[3])}</td>
+                <td>${fmtE(a.r[6])}</td>
+                <td>${fmtE(a.med)}</td>
+                <td>${a.sigma}σ</td>
+                <td><span class="tag ${a.type === 'surévalué' ? 'rouge' : 'vert'}">${a.type}</span></td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>`;
+      break;
+    }
+    case 'tension': {
+      const rows = state.allRows;
+      const parCommune = {};
+      for (const r of rows){
+        const c = r[1];
+        if (!parCommune[c]) parCommune[c] = 0;
+        parCommune[c]++;
+      }
+      const tensions = Object.entries(parCommune)
+        .filter(([insee, _]) => POPULATION[insee])
+        .map(([insee, n]) => {
+          const pop = POPULATION[insee];
+          const tension = (n / pop) * 100;
+          return {insee, n, pop, tension: tension.toFixed(2)};
+        })
+        .sort((a, b) => parseFloat(b.tension) - parseFloat(a.tension));
+
+      const inseeVersNom = {};
+      for (const r of rows){
+        if (!inseeVersNom[r[1]]) inseeVersNom[r[1]] = r[2];
+      }
+
+      area.innerHTML = `
+        <div class="card">
+          <h3>🔬 Indice de tension immobilière</h3>
+          <p>Ratio : ventes / population × 100 (plus élevé = marché très actif)</p>
+          ${tensions.slice(0, 20).map(t => `
+            <div class="bar-row">
+              <div class="name">${esc(inseeVersNom[t.insee] || t.insee)}</div>
+              <div class="bar-track"><div class="bar-fill ${parseFloat(t.tension) > 5 ? 'rouge' : parseFloat(t.tension) > 2 ? 'or' : 'vert'}" style="width:${Math.min(100, parseFloat(t.tension) * 15)}%"></div></div>
+              <div class="val">${t.tension}%</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <h3>📋 Détail</h3>
+          <table>
+            <thead><tr><th>Commune</th><th>Ventes</th><th>Population</th><th>Tension</th></tr></thead>
+            <tbody>${tensions.slice(0, 15).map(t => `
+              <tr>
+                <td>${esc(inseeVersNom[t.insee] || t.insee)}</td>
+                <td>${fmt(t.n)}</td>
+                <td>${fmt(t.pop)}</td>
+                <td class="v ${parseFloat(t.tension) > 5 ? 'rouge' : 'or'}"><strong>${t.tension}%</strong></td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>`;
+      break;
+    }
+  }
+}
+
+/* ========== ÉVÉNEMENTS ========== */
+$('btnSearch').onclick = () => {
+  state.query = $('queryInput').value.trim();
+  state.queryType = '';
+  state.activeView = 'mutations';
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'mutations'));
+  renderView();
+};
+$('btnReset').onclick = () => {
+  state.query = '';
+  state.queryType = '';
+  state.filters = {yearMin:'',yearMax:'',pm2Min:'',pm2Max:'',surfMin:'',surfMax:''};
+  $('queryInput').value = '';
+  state.activeView = 'overview';
+  state.activeScenario = 's1';
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'overview'));
+  renderScenarios();
+  renderView();
+};
+$('queryInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnSearch').click(); });
+
+document.querySelectorAll('.mode-tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.mode-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  state.activeView = t.dataset.view;
+  const sc = SCENARIOS.find(s => s.view === state.activeView);
+  if (sc) state.activeScenario = sc.id;
+  renderScenarios();
+  renderView();
+});
+
+/* ========== INIT ========== */
+(async () => {
+  applyTheme();
+  renderScenarios();
+  await loadData();
+  if (state.stats){
+    loadStatsUI();
+    renderView();
+  }
+})();
+</script>
+</body>
+</html>
